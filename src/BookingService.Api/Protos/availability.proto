@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package availability;
+
+import "google/protobuf/timestamp.proto";
+
+service AvailabilityService {
+  // Check if a time slot is available for booking
+  rpc CheckTimeSlotAvailability(TimeSlotRequest) returns (TimeSlotResponse);
+}
+
+message TimeSlotRequest {
+  string tenant_id = 1;
+  string service_id = 2;
+  google.protobuf.Timestamp start_time = 3;
+  google.protobuf.Timestamp end_time = 4;
+}
+
+message TimeSlotResponse {
+  bool is_available = 1;
+  repeated ConflictInfo conflicts = 2;
+}
+
+message ConflictInfo {
+  ConflictType type = 1;
+  google.protobuf.Timestamp overlap_start = 2;
+  google.protobuf.Timestamp overlap_end = 3;
+}
+
+enum ConflictType {
+  CONFLICT_TYPE_UNSPECIFIED = 0;
+  CONFLICT_TYPE_TIME_BLOCK = 1;
+  CONFLICT_TYPE_WORKING_HOURS = 2;
+  CONFLICT_TYPE_BOOKING = 3;
+  CONFLICT_TYPE_BUFFER_TIME = 4;
+}
