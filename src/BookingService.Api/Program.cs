@@ -9,6 +9,7 @@ using HealthChecks.UI.Client;
 using BookingService.Api.Middleware;
 using BookingService.Api.Services.Interfaces;
 using BookingService.Api.Services.Grpc;
+using BookingService.Api.HealthChecks;
 using BookingService.Database;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
@@ -73,6 +74,9 @@ if (builder.Environment.IsDevelopment())
 
 builder.Configuration.AddEnvironmentVariables();
 
+// Configure Kafka settings
+builder.Services.Configure<KafkaSettings>(builder.Configuration.GetSection("Kafka"));
+
 // Configure JWT settings
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSettings.SectionName));
 
@@ -101,6 +105,22 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy("TenantResource", policy =>
         policy.RequireAuthenticatedUser());
 
+// Configure CORS settings
+builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(CorsSettings.SectionName));
+
+// Configure CORS
+var corsSettings = builder.Configuration.GetSection(CorsSettings.SectionName).Get<CorsSettings>() ?? new CorsSettings();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins(corsSettings.AllowedOrigins)
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
+});
+
 // Database configuration
 builder.Services.AddBookingDatabase();
 
@@ -122,10 +142,13 @@ builder.Services.AddHealthChecks()
         healthQuery: "SELECT 1;",
         name: "postgresql",
         failureStatus: HealthStatus.Unhealthy,
-        tags: ["db", "postgresql"]);
+        tags: ["db", "postgresql"])
+    .AddCheck<KafkaHealthCheck>("kafka", tags: ["kafka", "messaging", "db"])
+    .AddCheck<AvailabilityGrpcHealthCheck>("availability-grpc", tags: ["grpc", "db"]);
 
 // Register middleware
 builder.Services.AddTransient<GlobalExceptionHandler>();
+builder.Services.AddTransient<RequestResponseLoggingMiddleware>();
 
 // Register filters
 builder.Services.AddScoped<ModelValidationFilter>();
@@ -142,6 +165,18 @@ builder.Services.AddScoped<IAvailabilityGrpcClient, AvailabilityGrpcClient>();
 // Register application services
 builder.Services.AddScoped<IUserContextService, BookingService.Api.Services.UserContextService>();
 builder.Services.AddScoped<IBookingService, BookingService.Api.Services.BookingService>();
+
+// Register tenant event service
+builder.Services.AddScoped<ITenantEventService, BookingService.Api.Services.TenantEventService>();
+
+// Register service catalog event service
+builder.Services.AddScoped<IServiceCatalogEventService, BookingService.Api.Services.ServiceCatalogEventService>();
+
+// Register Kafka producer service
+builder.Services.AddSingleton<IKafkaProducerService, BookingService.Api.Services.KafkaProducerService>();
+
+// Register Kafka consumer as background service
+builder.Services.AddHostedService<BookingService.Api.Services.KafkaConsumerService>();
 
 var app = builder.Build();
 
@@ -166,6 +201,9 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// Add request/response logging middleware
+app.UseMiddleware<RequestResponseLoggingMiddleware>();
+
 // Add global exception handling middleware
 app.UseMiddleware<GlobalExceptionHandler>();
 
@@ -173,6 +211,8 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseCors("AllowFrontend");
 
 // Add /metrics endpoints for Prometheus
 app.UseHttpMetrics(); 
@@ -196,7 +236,7 @@ app.MapHealthChecks("/health/live", new HealthCheckOptions
 
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
-    Predicate = (check) => check.Tags.Contains("self") || check.Tags.Contains("db"),
+    Predicate = check => check.Tags.Contains("db"),
     ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse,
     AllowCachingResponses = false
 });

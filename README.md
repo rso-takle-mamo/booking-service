@@ -299,6 +299,18 @@ The gRPC client handles various error scenarios:
 | `JWT_SECRET_KEY` | Yes | JWT signing key (minimum 128 bits) |
 | `ASPNETCORE_ENVIRONMENT` | No | Environment (Development/Production) |
 | `AvailabilityServiceGrpc__Url` | No | Availability Service gRPC URL (overrides appsettings) |
+| `KAFKA__BOOTSTRAPSERVERS` | Yes | Kafka bootstrap servers |
+| `KAFKA__CLIENTID` | Yes | Kafka client ID (producer) |
+| `KAFKA__TENANTEVENTSTOPIC` | Yes | Tenant events topic (consumer) |
+| `KAFKA__SERVICECATALOGEVENTSTOPIC` | Yes | Service catalog events topic (consumer) |
+| `KAFKA__BOOKINGEVENTSTOPIC` | Yes | Booking events topic (producer) |
+| `KAFKA__CONSUMERGROUPID` | Yes | Kafka consumer group ID |
+| `KAFKA__ENABLEAUTOCOMMIT` | Yes | Kafka auto-commit setting |
+| `KAFKA__AUTOOFFSETRESET` | Yes | Kafka auto offset reset |
+| `KAFKA__ACKS` | Yes | Kafka producer acks setting |
+| `KAFKA__ENABLEIDEMPOTENCE` | Yes | Kafka producer idempotence |
+| `KAFKA__MESSAGETIMEOUTMS` | Yes | Kafka message timeout |
+| `KAFKA__REQUESTTIMEOUTMS` | Yes | Kafka request timeout |
 
 ## Health Checks
 
@@ -314,3 +326,43 @@ The gRPC client handles various error scenarios:
 | 1 | Confirmed | Booking is confirmed and scheduled |
 | 2 | Completed | Booking has been completed |
 | 3 | Cancelled | Booking has been cancelled
+
+## Kafka Events
+
+The Booking Service acts as both a **Kafka Producer** (for booking events) and **Kafka Consumer** (for tenant and service catalog events).
+
+### Published Events
+
+| Event Type | Topic | Trigger | Description |
+|------------|-------|---------|-------------|
+| `BookingCreatedEvent` | `booking-events` | Booking creation | Contains full booking details including service, time slot, and customer |
+| `BookingCancelledEvent` | `booking-events` | Booking cancellation | Contains BookingId, TenantId, OwnerId, ServiceId |
+
+### Consumed Events
+
+| Event Type | Topic | Handler | Description |
+|------------|-------|---------|-------------|
+| `TenantCreatedEvent` | `tenant-events` | `TenantEventService` | Creates tenant in local database |
+| `TenantUpdatedEvent` | `tenant-events` | `TenantEventService` | Updates tenant in local database |
+| `ServiceCreatedEvent` | `service-catalog-events` | `ServiceCatalogEventService` | Creates service in local database |
+| `ServiceEditedEvent` | `service-catalog-events` | `ServiceCatalogEventService` | Updates service in local database |
+| `ServiceDeletedEvent` | `service-catalog-events` | `ServiceCatalogEventService` | Deletes service from local database |
+| `CategoryCreatedEvent` | `service-catalog-events` | `ServiceCatalogEventService` | Creates category in local database |
+| `CategoryEditedEvent` | `service-catalog-events` | `ServiceCatalogEventService` | Updates category in local database |
+| `CategoryDeletedEvent` | `service-catalog-events` | `ServiceCatalogEventService` | Deletes category from local database |
+
+### Producer Configuration
+
+- **Acks**: `all` (strongest durability guarantee)
+- **Idempotence**: `enabled` (prevents duplicate messages)
+- **Message Timeout**: 5000ms
+- **Request Timeout**: 3000ms
+- **Serialization**: JSON with camelCase property naming
+
+### Consumer Configuration
+
+- **Auto Commit**: `false` (manual offset management)
+- **Offset Reset**: `earliest` (read from beginning)
+- **Consumer Groups**:
+  - `booking-service-tenant-events` (for tenant events)
+  - `booking-service-service-catalog-events` (for service catalog events)

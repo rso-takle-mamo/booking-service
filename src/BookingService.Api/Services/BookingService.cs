@@ -1,6 +1,7 @@
 using BookingService.Api.Services.Interfaces;
 using BookingService.Api.Responses;
 using BookingService.Api.Requests;
+using BookingService.Api.Events.Booking;
 using BookingService.Database.Entities;
 using BookingService.Database.Repositories.Interfaces;
 using BookingService.Api.Exceptions;
@@ -13,6 +14,7 @@ public class BookingService(
     IBookingRepository bookingRepository,
     IServiceRepository serviceRepository,
     IAvailabilityGrpcClient availabilityGrpcClient,
+    IKafkaProducerService kafkaProducerService,
     ILogger<BookingService> logger): IBookingService
 {
     public async Task<BookingResponse> CreateBookingAsync(CreateBookingRequest request, Guid userId, Guid tenantId)
@@ -81,6 +83,20 @@ public class BookingService(
         };
 
         var createdBooking = await bookingRepository.CreateAsync(booking);
+
+        // Publish BookingCreated event
+        var bookingCreatedEvent = new BookingCreatedEvent
+        {
+            BookingId = createdBooking.Id,
+            TenantId = createdBooking.TenantId,
+            OwnerId = createdBooking.OwnerId,
+            ServiceId = createdBooking.ServiceId,
+            StartDateTime = createdBooking.StartDateTime,
+            EndDateTime = createdBooking.EndDateTime,
+            BookingStatus = createdBooking.BookingStatus,
+            Notes = createdBooking.Notes
+        };
+        await kafkaProducerService.PublishBookingEventAsync(bookingCreatedEvent);
 
         return MapToResponse(createdBooking);
     }
@@ -175,6 +191,16 @@ public class BookingService(
 
         booking.BookingStatus = BookingStatus.Cancelled;
         var updatedBooking = await bookingRepository.UpdateAsync(booking);
+
+        // Publish BookingCancelled event
+        var bookingCancelledEvent = new BookingCancelledEvent
+        {
+            BookingId = updatedBooking.Id,
+            TenantId = updatedBooking.TenantId,
+            OwnerId = updatedBooking.OwnerId,
+            ServiceId = updatedBooking.ServiceId
+        };
+        await kafkaProducerService.PublishBookingEventAsync(bookingCancelledEvent);
 
         return MapToResponse(updatedBooking);
     }
