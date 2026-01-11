@@ -21,12 +21,20 @@ public sealed class KafkaHealthCheck(
             var config = new AdminClientConfig
             {
                 BootstrapServers = _kafkaSettings.BootstrapServers,
-                SocketTimeoutMs = 1000
+                SocketTimeoutMs = 5000
             };
+
+            if (!string.IsNullOrEmpty(_kafkaSettings.SaslPassword))
+            {
+                config.SecurityProtocol = ParseSecurityProtocol(_kafkaSettings.SecurityProtocol);
+                config.SaslMechanism = ParseSaslMechanism(_kafkaSettings.SaslMechanism);
+                config.SaslUsername = _kafkaSettings.SaslUsername;
+                config.SaslPassword = _kafkaSettings.SaslPassword;
+            }
 
             using var adminClient = new AdminClientBuilder(config).Build();
 
-            adminClient.GetMetadata(TimeSpan.FromSeconds(1));
+            adminClient.GetMetadata(TimeSpan.FromSeconds(5));
 
             return Task.FromResult(
                 HealthCheckResult.Healthy("Kafka broker reachable"));
@@ -39,4 +47,14 @@ public sealed class KafkaHealthCheck(
                 HealthCheckResult.Unhealthy("Kafka broker not reachable", ex));
         }
     }
+
+    private static SecurityProtocol ParseSecurityProtocol(string protocol)
+        => Enum.TryParse<SecurityProtocol>(protocol, out var parsed)
+            ? parsed
+            : SecurityProtocol.SaslSsl;
+
+    private static SaslMechanism ParseSaslMechanism(string mechanism)
+        => Enum.TryParse<SaslMechanism>(mechanism, out var parsed)
+            ? parsed
+            : SaslMechanism.Plain;
 }

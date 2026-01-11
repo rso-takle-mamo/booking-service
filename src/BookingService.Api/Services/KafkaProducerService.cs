@@ -30,6 +30,14 @@ public class KafkaProducerService : IKafkaProducerService, IDisposable
             RequestTimeoutMs = _kafkaSettings.RequestTimeoutMs
         };
 
+        if (!string.IsNullOrEmpty(_kafkaSettings.SaslPassword))
+        {
+            producerConfig.SecurityProtocol = ParseSecurityProtocol(_kafkaSettings.SecurityProtocol);
+            producerConfig.SaslMechanism = ParseSaslMechanism(_kafkaSettings.SaslMechanism);
+            producerConfig.SaslUsername = _kafkaSettings.SaslUsername;
+            producerConfig.SaslPassword = _kafkaSettings.SaslPassword;
+        }
+
         _producer = new ProducerBuilder<Null, string>(producerConfig).Build();
     }
 
@@ -65,7 +73,7 @@ public class KafkaProducerService : IKafkaProducerService, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to publish booking event {EventType} [EventId: {EventId}]", bookingEvent.EventType, bookingEvent.EventId);
-            throw;  // Fail fast - bubble up to caller
+            throw;
         }
     }
 
@@ -73,4 +81,14 @@ public class KafkaProducerService : IKafkaProducerService, IDisposable
     {
         _producer?.Dispose();
     }
+
+    private static SecurityProtocol ParseSecurityProtocol(string protocol)
+        => Enum.TryParse<SecurityProtocol>(protocol, out var parsed)
+            ? parsed
+            : SecurityProtocol.SaslSsl;
+
+    private static SaslMechanism ParseSaslMechanism(string mechanism)
+        => Enum.TryParse<SaslMechanism>(mechanism, out var parsed)
+            ? parsed
+            : SaslMechanism.Plain;
 }

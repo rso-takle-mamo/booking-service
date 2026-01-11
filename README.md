@@ -134,8 +134,8 @@ Authorization: Bearer <token>
 
 **Remarks:**
 - **CUSTOMERS:**
-  - Must provide `tenantId` query parameter
-  - Can only retrieve their own bookings
+  - `tenantId` is **optional** - if provided, filters bookings by that tenant; if omitted, returns all their bookings across all tenants
+  - Can only retrieve their own bookings (filtered by JWT user ID)
 - **PROVIDERS:**
   - Cannot provide `tenantId` parameter (automatically uses their own tenant)
   - Can retrieve all bookings within their tenant
@@ -143,7 +143,7 @@ Authorization: Bearer <token>
 **Parameters:**
 - `offset` (Integer, optional) - Number of items to skip (default: 0)
 - `limit` (Integer, optional) - Number of items to return (default: 50)
-- `tenantId` (GUID, required for customers, forbidden for providers)
+- `tenantId` (GUID, optional for customers, forbidden for providers) - Filter bookings by specific tenant
 - `startDate` (DateTime, optional) - Filter bookings from this date onwards (format: 2026-01-01T00:00:00Z)
 - `endDate` (DateTime, optional) - Filter bookings up to this date (format: 2026-01-01T23:59:59Z)
 - `status` (Integer, optional) - Filter by booking status (0=Pending, 1=Confirmed, 2=Completed, 3=Cancelled)

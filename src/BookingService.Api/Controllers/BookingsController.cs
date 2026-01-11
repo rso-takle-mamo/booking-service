@@ -87,15 +87,14 @@ public class BookingsController(
     /// </summary>
     /// <remarks>
     /// **CUSTOMERS:**
-    /// Can retrieve their own bookings
-    /// Must provide tenantId query parameter to specify which tenant's bookings to view
+    /// Can retrieve their own bookings across all tenants, or optionally filter by a specific tenant
     ///
     /// **PROVIDERS:**
     /// Can retrieve any bookings within their tenant
     /// tenantId parameter is forbidden (automatically uses their own tenant)
     ///
     /// Filter options:
-    /// - tenantId: Required for customers, forbidden for providers
+    /// - tenantId: Optional for customers (filters by specific tenant), forbidden for providers
     /// - startDate: Filter bookings from this date onwards (UTC)
     /// - endDate: Filter bookings up to this date (UTC)
     /// - status: Filter by booking status (Pending, Confirmed, Completed, Cancelled)
@@ -110,16 +109,15 @@ public class BookingsController(
         var userRole = GetUserRole();
         var isCustomer = IsCustomer();
 
-        
-        Guid tenantId;
+        Guid? tenantId = null;
         if (isCustomer)
         {
-            // Customers must provide tenantId in query parameters
-            if (!request.TenantId.HasValue)
+            // Customers can optionally provide tenantId to filter by specific tenant
+            // If not provided, they will see all their bookings across all tenants
+            if (request.TenantId.HasValue)
             {
-                throw new AuthorizationException("Booking", "read", "Tenant ID is required for customers to retrieve bookings.");
+                tenantId = request.TenantId.Value;
             }
-            tenantId = request.TenantId.Value;
         }
         else
         {
@@ -135,8 +133,8 @@ public class BookingsController(
             tenantId = userTenantId.Value;
         }
 
-        logger.LogInformation("Retrieving bookings for user {UserId}, role {Role}, tenant {TenantId}, with filters: {@Request}",
-            userId, userRole, tenantId, request);
+        logger.LogInformation("Retrieving bookings for user {UserId}, role {Role}, tenant filter {TenantId}, with filters: {@Request}",
+            userId, userRole, tenantId?.ToString() ?? "none", request);
 
         var (bookings, totalCount) = await bookingService.GetBookingsAsync(request, userId, tenantId, userRole);
 

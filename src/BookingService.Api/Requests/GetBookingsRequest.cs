@@ -14,8 +14,9 @@ public class GetBookingsRequest : PaginationRequest
     public BookingStatus? Status { get; set; }
 
     /// <summary>
-    /// Tenant ID - Required for customers (specifies which tenant's bookings to retrieve),
+    /// Tenant ID - Optional for customers (filters bookings by specific tenant),
     /// forbidden for providers (automatically uses their own tenant)
+    /// If not provided, customers see all their bookings across all tenants
     /// </summary>
     /// <example>3fa85f64-5717-4562-b3fc-2c963f66afa6</example>
     public Guid? TenantId { get; set; }

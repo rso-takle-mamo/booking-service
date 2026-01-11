@@ -84,7 +84,6 @@ public class BookingService(
 
         var createdBooking = await bookingRepository.CreateAsync(booking);
 
-        // Publish BookingCreated event
         var bookingCreatedEvent = new BookingCreatedEvent
         {
             BookingId = createdBooking.Id,
@@ -130,7 +129,7 @@ public class BookingService(
     public async Task<(PaginatedResponse<BookingResponse> Bookings, int TotalCount)> GetBookingsAsync(
         GetBookingsRequest request,
         Guid userId,
-        Guid tenantId,
+        Guid? tenantId,
         string userRole)
     {
         List<Booking> bookings;
@@ -138,10 +137,19 @@ public class BookingService(
         if (userRole.Equals("Customer", StringComparison.OrdinalIgnoreCase))
         {
             bookings = await bookingRepository.GetByOwnerIdAsync(userId);
+
+            if (tenantId.HasValue)
+            {
+                bookings = bookings.Where(b => b.TenantId == tenantId.Value).ToList();
+            }
         }
         else
         {
-            bookings = await bookingRepository.GetByTenantIdAsync(tenantId);
+            if (!tenantId.HasValue)
+            {
+                throw new AuthorizationException("Booking", "read", "Providers must have a tenant ID.");
+            }
+            bookings = await bookingRepository.GetByTenantIdAsync(tenantId.Value);
         }
 
         bookings = ApplyFilters(bookings, request);
@@ -192,7 +200,6 @@ public class BookingService(
         booking.BookingStatus = BookingStatus.Cancelled;
         var updatedBooking = await bookingRepository.UpdateAsync(booking);
 
-        // Publish BookingCancelled event
         var bookingCancelledEvent = new BookingCancelledEvent
         {
             BookingId = updatedBooking.Id,

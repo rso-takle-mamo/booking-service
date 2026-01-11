@@ -13,9 +13,13 @@ public class KafkaSettings
     public bool EnableAutoCommit { get; set; }
     public string AutoOffsetReset { get; set; } = "Earliest";
 
-    // Producer settings (with defaults)
     public string Acks { get; set; } = "all";
     public bool EnableIdempotence { get; set; } = true;
     public int MessageTimeoutMs { get; set; } = 5000;
     public int RequestTimeoutMs { get; set; } = 3000;
+
+    public string SecurityProtocol { get; set; } = "SaslSsl";
+    public string SaslMechanism { get; set; } = "Plain";
+    public string SaslUsername { get; set; } = "$ConnectionString";
+    public string SaslPassword { get; set; } = string.Empty;
 }

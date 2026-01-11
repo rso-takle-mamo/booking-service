@@ -23,24 +23,40 @@ public class KafkaConsumerService(
 
     private ConsumerConfig CreateTenantConsumerConfig()
     {
-        return new ConsumerConfig
+        var config = new ConsumerConfig
         {
             BootstrapServers = _kafkaSettings.BootstrapServers,
             GroupId = $"{_kafkaSettings.ConsumerGroupId}-tenant-events",
             AutoOffsetReset = KafkaConstants.ParseAutoOffsetReset(_kafkaSettings.AutoOffsetReset),
             EnableAutoCommit = _kafkaSettings.EnableAutoCommit
         };
+
+        if (string.IsNullOrEmpty(_kafkaSettings.SaslPassword)) return config;
+        config.SecurityProtocol = ParseSecurityProtocol(_kafkaSettings.SecurityProtocol);
+        config.SaslMechanism = ParseSaslMechanism(_kafkaSettings.SaslMechanism);
+        config.SaslUsername = _kafkaSettings.SaslUsername;
+        config.SaslPassword = _kafkaSettings.SaslPassword;
+
+        return config;
     }
 
     private ConsumerConfig CreateServiceCatalogConsumerConfig()
     {
-        return new ConsumerConfig
+        var config = new ConsumerConfig
         {
             BootstrapServers = _kafkaSettings.BootstrapServers,
             GroupId = $"{_kafkaSettings.ConsumerGroupId}-service-catalog-events",
             AutoOffsetReset = KafkaConstants.ParseAutoOffsetReset(_kafkaSettings.AutoOffsetReset),
             EnableAutoCommit = _kafkaSettings.EnableAutoCommit
         };
+
+        if (string.IsNullOrEmpty(_kafkaSettings.SaslPassword)) return config;
+        config.SecurityProtocol = ParseSecurityProtocol(_kafkaSettings.SecurityProtocol);
+        config.SaslMechanism = ParseSaslMechanism(_kafkaSettings.SaslMechanism);
+        config.SaslUsername = _kafkaSettings.SaslUsername;
+        config.SaslPassword = _kafkaSettings.SaslPassword;
+
+        return config;
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -359,4 +375,14 @@ public class KafkaConsumerService(
         logger.LogInformation("Kafka Consumer Service stopping...");
         await base.StopAsync(cancellationToken);
     }
+
+    private static SecurityProtocol ParseSecurityProtocol(string protocol)
+        => Enum.TryParse<SecurityProtocol>(protocol, out var parsed)
+            ? parsed
+            : SecurityProtocol.SaslSsl;
+
+    private static SaslMechanism ParseSaslMechanism(string mechanism)
+        => Enum.TryParse<SaslMechanism>(mechanism, out var parsed)
+            ? parsed
+            : SaslMechanism.Plain;
 }

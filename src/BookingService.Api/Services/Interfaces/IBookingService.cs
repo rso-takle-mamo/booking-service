@@ -10,7 +10,7 @@ public interface IBookingService
     Task<(PaginatedResponse<BookingResponse> Bookings, int TotalCount)> GetBookingsAsync(
         GetBookingsRequest request,
         Guid userId,
-        Guid tenantId,
+        Guid? tenantId,
         string userRole);
     Task<BookingResponse> CancelBookingAsync(Guid id, Guid userId);
 }
